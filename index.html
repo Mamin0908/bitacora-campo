@@ -195,6 +195,24 @@
     cursor:pointer;font-family:var(--sans);
   }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBO7mhEa6TxpJNpFmsljII2vVSXvPGTEpA",
+    authDomain: "bitacora-de-registros.firebaseapp.com",
+    projectId: "bitacora-de-registros",
+    storageBucket: "bitacora-de-registros.firebasestorage.app",
+    messagingSenderId: "857278403219",
+    appId: "1:857278403219:web:d3a364d93c9f0663bff366",
+    measurementId: "G-SPKHR3NK9S"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const fbDb = firebase.firestore();
+  const fbStorage = firebase.storage();
+  fbDb.enablePersistence({synchronizeTabs:true}).catch(()=>{ /* persistence not available, app still works online */ });
+</script>
 </head>
 <body>
 <div id="app">
@@ -351,60 +369,39 @@
     reader.readAsDataURL(file);
   });
 
-  // ---------- Storage helpers (IndexedDB - fully local, no internet needed) ----------
-  function openDB(){
-    return new Promise((resolve, reject)=>{
-      const req = indexedDB.open('bitacora-campo-db', 1);
-      req.onupgradeneeded = ()=>{ req.result.createObjectStore('kv'); };
-      req.onsuccess = ()=> resolve(req.result);
-      req.onerror = ()=> reject(req.error);
-    });
-  }
-  async function dbGet(key){
-    const db = await openDB();
-    return new Promise((resolve, reject)=>{
-      const tx = db.transaction('kv','readonly');
-      const r = tx.objectStore('kv').get(key);
-      r.onsuccess = ()=> resolve(r.result);
-      r.onerror = ()=> reject(r.error);
-    });
-  }
-  async function dbSet(key, value){
-    const db = await openDB();
-    return new Promise((resolve, reject)=>{
-      const tx = db.transaction('kv','readwrite');
-      tx.objectStore('kv').put(value, key);
-      tx.oncomplete = ()=> resolve(true);
-      tx.onerror = ()=> reject(tx.error);
-    });
-  }
-  async function dbDelete(key){
-    const db = await openDB();
-    return new Promise((resolve, reject)=>{
-      const tx = db.transaction('kv','readwrite');
-      tx.objectStore('kv').delete(key);
-      tx.oncomplete = ()=> resolve(true);
-      tx.onerror = ()=> reject(tx.error);
-    });
-  }
-
+  // ---------- Storage helpers (Firebase: Firestore + Storage, cloud-synced) ----------
   async function loadEntries(){
     try{
-      const val = await dbGet('log-entries');
-      entries = Array.isArray(val) ? val : [];
+      const snap = await fbDb.collection('entries').orderBy('ts','desc').get();
+      entries = snap.docs.map(d=>d.data());
     }catch(err){
       entries = [];
     }
     loaded = true;
   }
 
-  async function saveEntries(){
+  async function saveEntryCloud(entry){
     try{
-      await dbSet('log-entries', entries);
+      await fbDb.collection('entries').doc(entry.id).set(entry);
       return true;
     }catch(err){
       return false;
     }
+  }
+
+  async function deleteEntryCloud(entry){
+    try{ await fbDb.collection('entries').doc(entry.id).delete(); }catch(err){}
+    if(entry.hasPhoto){
+      try{ await fbStorage.ref('photos/'+entry.id+'.jpg').delete(); }catch(err){}
+    }
+  }
+
+  async function uploadPhotoCloud(id, dataUrl){
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const ref = fbStorage.ref('photos/'+id+'.jpg');
+    await ref.put(blob);
+    return await ref.getDownloadURL();
   }
 
   // ---------- Save new activity ----------
@@ -427,7 +424,7 @@
     const entry = {
       id, ts: new Date().toISOString(),
       contrato, actividad, tipo, facturada, equipos, descripcion,
-      hasPhoto: !!photoData
+      hasPhoto: !!photoData, photoURL: null
     };
 
     document.getElementById('btnGuardar').disabled = true;
@@ -436,17 +433,16 @@
 
     try{
       if(photoData){
-        await dbSet('photo-'+id, photoData);
+        entry.photoURL = await uploadPhotoCloud(id, photoData);
       }
-      entries.unshift(entry);
-      const ok = await saveEntries();
+      const ok = await saveEntryCloud(entry);
       if(!ok) throw new Error('No se pudo guardar');
+      entries.unshift(entry);
       msg.textContent = 'Actividad guardada ✓';
       msg.className = 'msg ok';
       resetForm();
     }catch(err){
-      entries.shift();
-      msg.textContent = 'Error al guardar. Intenta de nuevo.';
+      msg.textContent = 'Error al guardar. Revisa tu conexión e intenta de nuevo.';
       msg.className = 'msg err';
     }
     document.getElementById('btnGuardar').disabled = false;
@@ -504,7 +500,7 @@
             <div class="row"><b>Facturada:</b> <span class="badge ${e.facturada==='SI'?'si':'no'}">${e.facturada}</span>
               &nbsp;<b>Equipos:</b> <span class="badge ${e.equipos==='SI'?'si':'no'}">${e.equipos}</span></div>
             ${e.descripcion ? `<div class="row"><b>Descripción:</b> ${escapeHtml(e.descripcion)}</div>` : ''}
-            ${e.hasPhoto ? `<img data-photoid="${e.id}" class="lazy-photo">` : ''}
+            ${e.hasPhoto && e.photoURL ? `<img src="${e.photoURL}" loading="lazy">` : ''}
             <button class="del" data-del="${e.id}">Eliminar registro</button>
           </div>
         </div>`;
@@ -514,20 +510,10 @@
     cont.innerHTML = html;
 
     cont.querySelectorAll('.ticket-head').forEach(h=>{
-      h.addEventListener('click', async ()=>{
+      h.addEventListener('click', ()=>{
         const id = h.dataset.id;
         const body = document.getElementById('body-'+id);
-        const opening = !body.classList.contains('open');
         body.classList.toggle('open');
-        if(opening){
-          const img = body.querySelector('.lazy-photo');
-          if(img && !img.src){
-            try{
-              const val = await dbGet('photo-'+id);
-              if(val) img.src = val;
-            }catch(err){ /* photo unavailable */ }
-          }
-        }
       });
     });
 
@@ -536,9 +522,9 @@
         ev.stopPropagation();
         const id = b.dataset.del;
         if(!confirm('¿Eliminar este registro?')) return;
+        const entry = entries.find(e=>e.id===id);
         entries = entries.filter(e=>e.id!==id);
-        await saveEntries();
-        try{ await dbDelete('photo-'+id); }catch(err){}
+        if(entry) await deleteEntryCloud(entry);
         renderHistorial();
       });
     });
@@ -648,13 +634,12 @@
 
   // ---------- Reset all ----------
   document.getElementById('btnReset').addEventListener('click', async ()=>{
-    if(!confirm('Esto eliminará TODOS los registros guardados. ¿Continuar?')) return;
+    if(!confirm('Esto eliminará TODOS los registros guardados en la nube. ¿Continuar?')) return;
     try{
       for(const e of entries){
-        if(e.hasPhoto){ try{ await dbDelete('photo-'+e.id); }catch(err){} }
+        await deleteEntryCloud(e);
       }
       entries = [];
-      await saveEntries();
       renderHistorial();
       renderReporte();
       alert('Registros eliminados.');
