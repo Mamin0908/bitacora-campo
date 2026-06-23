@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Bitácora de Campo</title>
+<style>
+  :root{
+    --bg:#11151B;
+    --surface:#1A2029;
+    --surface-2:#222B36;
+    --border:#2C3642;
+    --text:#E9ECF1;
+    --text-dim:#8B96A5;
+    --text-faint:#5C6878;
+    --accent:#4C9AFF;
+    --accent-dim:#1F3A5C;
+    --gpon:#2ED9A3;
+    --gpon-dim:#143D31;
+    --hfc:#F2A93B;
+    --hfc-dim:#3D2E10;
+    --danger:#E55A5A;
+    --danger-dim:#3B1E1E;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #app{max-width:480px;margin:0 auto;padding:16px 16px 90px;}
+
+  header.top{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:6px 2px 16px;border-bottom:1px solid var(--border);margin-bottom:18px;
+  }
+  header.top h1{
+    font-size:17px;font-weight:700;letter-spacing:.2px;margin:0;
+  }
+  header.top .eyebrow{
+    font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--text-faint);
+    text-transform:uppercase;display:block;margin-bottom:3px;
+  }
+  header.top .today{
+    font-family:var(--mono);font-size:11px;color:var(--text-dim);
+  }
+
+  nav.tabs{
+    display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;padding:4px;margin-bottom:20px;position:sticky;top:10px;z-index:10;
+  }
+  nav.tabs button{
+    flex:1;border:none;background:transparent;color:var(--text-dim);
+    font-family:var(--sans);font-size:13px;font-weight:600;padding:9px 4px;border-radius:7px;
+    cursor:pointer;transition:background .15s,color .15s;
+  }
+  nav.tabs button.active{background:var(--surface-2);color:var(--text);}
+
+  .panel{display:none;}
+  .panel.active{display:block;animation:fade .18s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:translateY(0);}}
+
+  .field{margin-bottom:16px;}
+  .field label{
+    display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.8px;
+    text-transform:uppercase;color:var(--text-faint);margin-bottom:6px;
+  }
+  input[type=text], input[type=number], select, textarea, input[type=month]{
+    width:100%;background:var(--surface);border:1px solid var(--border);
+    color:var(--text);font-family:var(--sans);font-size:15px;padding:11px 12px;
+    border-radius:9px;outline:none;
+  }
+  input:focus, select:focus, textarea:focus{border-color:var(--accent);}
+  textarea{resize:vertical;min-height:80px;line-height:1.4;}
+  select{appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238B96A5' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat:no-repeat;background-position:right 12px center;padding-right:34px;
+  }
+
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;flex:none;}
+  .dot.gpon{background:var(--gpon);box-shadow:0 0 6px var(--gpon);}
+  .dot.hfc{background:var(--hfc);box-shadow:0 0 6px var(--hfc);}
+
+  .segmented{display:flex;gap:8px;}
+  .segmented button{
+    flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text-dim);
+    font-family:var(--sans);font-weight:700;font-size:13.5px;padding:11px 0;border-radius:9px;cursor:pointer;
+  }
+  .segmented button.sel-si.active{background:var(--gpon-dim);border-color:var(--gpon);color:var(--gpon);}
+  .segmented button.sel-no.active{background:var(--danger-dim);border-color:var(--danger);color:var(--danger);}
+
+  .photo-zone{
+    border:1.5px dashed var(--border);border-radius:11px;padding:18px;text-align:center;
+    color:var(--text-dim);font-size:13px;position:relative;cursor:pointer;background:var(--surface);
+  }
+  .photo-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .photo-preview{width:100%;max-height:220px;object-fit:cover;border-radius:9px;display:block;margin-top:10px;}
+  .photo-zone .icon{font-size:22px;display:block;margin-bottom:6px;}
+
+  .btn-primary{
+    width:100%;background:var(--accent);color:#08111F;border:none;font-weight:700;font-size:15px;
+    padding:14px 0;border-radius:10px;cursor:pointer;font-family:var(--sans);margin-top:6px;
+  }
+  .btn-primary:active{opacity:.85;}
+  .btn-primary:disabled{background:var(--surface-2);color:var(--text-faint);}
+
+  .btn-secondary{
+    width:100%;background:transparent;border:1px solid var(--border);color:var(--text-dim);
+    font-weight:600;font-size:13.5px;padding:11px 0;border-radius:10px;cursor:pointer;
+    font-family:var(--sans);margin-top:10px;
+  }
+
+  .msg{font-size:12.5px;color:var(--text-faint);margin-top:8px;text-align:center;}
+  .msg.ok{color:var(--gpon);}
+  .msg.err{color:var(--danger);}
+
+  /* Historial */
+  .day-group{margin-bottom:22px;}
+  .day-group h3{
+    font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--text-faint);
+    text-transform:uppercase;margin:0 0 10px 2px;
+  }
+  .ticket{
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    margin-bottom:10px;position:relative;overflow:hidden;
+  }
+  .ticket::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+  }
+  .ticket.t-gpon::before{background:var(--gpon);}
+  .ticket.t-hfc::before{background:var(--hfc);}
+  .ticket-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:12px 14px 12px 18px;cursor:pointer;gap:10px;
+  }
+  .ticket-head .main{display:flex;align-items:center;min-width:0;}
+  .ticket-head .info{min-width:0;}
+  .ticket-head .contrato{font-family:var(--mono);font-size:13.5px;font-weight:700;}
+  .ticket-head .actividad{font-size:12px;color:var(--text-dim);margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ticket-head .time{font-family:var(--mono);font-size:11px;color:var(--text-faint);flex:none;}
+  .badge{
+    display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.5px;
+    padding:2px 6px;border-radius:5px;margin-left:6px;flex:none;
+  }
+  .badge.si{background:var(--gpon-dim);color:var(--gpon);}
+  .badge.no{background:var(--surface-2);color:var(--text-faint);}
+  .ticket-body{display:none;padding:0 14px 14px 18px;border-top:1px solid var(--border);}
+  .ticket-body.open{display:block;}
+  .ticket-body .row{font-size:13px;color:var(--text-dim);margin:8px 0;line-height:1.45;}
+  .ticket-body .row b{color:var(--text);}
+  .ticket-body img{width:100%;border-radius:8px;margin-top:8px;display:block;}
+  .ticket-body .del{
+    margin-top:10px;background:none;border:1px solid var(--danger);color:var(--danger);
+    font-size:12px;font-weight:600;padding:8px 12px;border-radius:8px;cursor:pointer;font-family:var(--sans);
+  }
+  .empty{
+    text-align:center;color:var(--text-faint);font-size:13px;padding:50px 10px;
+    border:1px dashed var(--border);border-radius:10px;
+  }
+
+  /* Reporte */
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0 20px;}
+  .stat{
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;
+  }
+  .stat .val{font-family:var(--mono);font-size:22px;font-weight:700;}
+  .stat .lbl{font-size:11px;color:var(--text-dim);margin-top:3px;}
+  .breakdown{margin-bottom:18px;}
+  .breakdown h4{font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:var(--text-faint);
+    font-family:var(--mono);margin:0 0 8px;}
+  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:7px;font-size:12.5px;}
+  .bar-row .lbl{width:118px;flex:none;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .bar-track{flex:1;height:7px;background:var(--surface-2);border-radius:4px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--accent);border-radius:4px;}
+  .bar-row .num{width:24px;text-align:right;font-family:var(--mono);color:var(--text-dim);}
+
+  table.rep{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:4px;}
+  table.rep th{
+    text-align:left;font-family:var(--mono);font-weight:600;color:var(--text-faint);
+    font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;
+    padding:6px 6px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);
+  }
+  table.rep td{padding:8px 6px;border-bottom:1px solid var(--border);color:var(--text-dim);}
+  .rep-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;margin-top:6px;}
+
+  footer.reset{margin-top:34px;text-align:center;}
+  footer.reset button{
+    background:none;border:none;color:var(--text-faint);font-size:11px;text-decoration:underline;
+    cursor:pointer;font-family:var(--sans);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div>
+      <span class="eyebrow">Registro de campo</span>
+      <h1>Bitácora de Actividades</h1>
+    </div>
+    <div class="today" id="todayLabel"></div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="registrar" class="active">Registrar</button>
+    <button data-tab="historial">Historial</button>
+    <button data-tab="reporte">Reporte</button>
+  </nav>
+
+  <!-- REGISTRAR -->
+  <section class="panel active" id="panel-registrar">
+    <div class="field">
+      <label>Contrato</label>
+      <input type="text" id="f-contrato" placeholder="Número de contrato" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>Actividad</label>
+      <select id="f-actividad">
+        <option value="">Seleccionar...</option>
+        <option>Instalación</option>
+        <option>Migración</option>
+        <option>Cambio de dirección</option>
+        <option>Visita Técnica</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Tipo</label>
+      <select id="f-tipo">
+        <option value="">Seleccionar...</option>
+        <option value="GPON">GPON</option>
+        <option value="HFC">HFC</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Facturada</label>
+      <div class="segmented" id="f-facturada">
+        <button type="button" class="sel-si" data-val="SI">SI</button>
+        <button type="button" class="sel-no" data-val="NO">NO</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Equipos Facturados</label>
+      <div class="segmented" id="f-equipos">
+        <button type="button" class="sel-si" data-val="SI">SI</button>
+        <button type="button" class="sel-no" data-val="NO">NO</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Descripción</label>
+      <textarea id="f-descripcion" placeholder="Detalle de la actividad realizada en el contrato..."></textarea>
+    </div>
+    <div class="field">
+      <label>Archivo Adjunto (foto)</label>
+      <div class="photo-zone" id="photoZone">
+        <input type="file" accept="image/*" capture="environment" id="f-foto">
+        <span class="icon">📷</span>
+        <span id="photoZoneText">Tocar para tomar o subir una foto</span>
+        <img id="photoPreview" class="photo-preview" style="display:none;">
+      </div>
+    </div>
+    <button class="btn-primary" id="btnGuardar">Guardar actividad</button>
+    <div class="msg" id="saveMsg"></div>
+  </section>
+
+  <!-- HISTORIAL -->
+  <section class="panel" id="panel-historial">
+    <div id="historialContent"><div class="empty">Cargando...</div></div>
+  </section>
+
+  <!-- REPORTE -->
+  <section class="panel" id="panel-reporte">
+    <div class="field">
+      <label>Mes</label>
+      <input type="month" id="rep-mes">
+    </div>
+    <div id="reportContent"></div>
+    <button class="btn-secondary" id="btnExportCsv">Exportar CSV del mes</button>
+    <footer class="reset">
+      <button id="btnReset">Borrar todos los registros</button>
+    </footer>
+  </section>
+</div>
+
+<script>
+(function(){
+  const ACT_LIST = ['Instalación','Migración','Cambio de dirección','Visita Técnica'];
+  let entries = [];
+  let loaded = false;
+  let photoData = null; // base64 of currently attached photo in the form
+
+  const todayLabel = document.getElementById('todayLabel');
+  todayLabel.textContent = new Date().toLocaleDateString('es-EC', {day:'2-digit', month:'short', year:'numeric'});
+
+  // ---------- Tabs ----------
+  document.querySelectorAll('nav.tabs button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+      if(btn.dataset.tab==='historial') renderHistorial();
+      if(btn.dataset.tab==='reporte') renderReporte();
+    });
+  });
+
+  // ---------- Segmented controls ----------
+  function wireSegmented(id){
+    const wrap = document.getElementById(id);
+    wrap.querySelectorAll('button').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        wrap.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+        b.classList.add('active');
+        wrap.dataset.value = b.dataset.val;
+      });
+    });
+  }
+  wireSegmented('f-facturada');
+  wireSegmented('f-equipos');
+
+  // ---------- Photo handling ----------
+  const fFoto = document.getElementById('f-foto');
+  const photoPreview = document.getElementById('photoPreview');
+  const photoZoneText = document.getElementById('photoZoneText');
+
+  fFoto.addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const maxDim = 900;
+        let w = img.width, h = img.height;
+        if(w > h && w > maxDim){ h = h*(maxDim/w); w = maxDim; }
+        else if(h > maxDim){ w = w*(maxDim/h); h = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        photoData = canvas.toDataURL('image/jpeg', 0.65);
+        photoPreview.src = photoData;
+        photoPreview.style.display = 'block';
+        photoZoneText.textContent = 'Foto adjuntada — tocar para cambiar';
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // ---------- Storage helpers (IndexedDB - fully local, no internet needed) ----------
+  function openDB(){
+    return new Promise((resolve, reject)=>{
+      const req = indexedDB.open('bitacora-campo-db', 1);
+      req.onupgradeneeded = ()=>{ req.result.createObjectStore('kv'); };
+      req.onsuccess = ()=> resolve(req.result);
+      req.onerror = ()=> reject(req.error);
+    });
+  }
+  async function dbGet(key){
+    const db = await openDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction('kv','readonly');
+      const r = tx.objectStore('kv').get(key);
+      r.onsuccess = ()=> resolve(r.result);
+      r.onerror = ()=> reject(r.error);
+    });
+  }
+  async function dbSet(key, value){
+    const db = await openDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction('kv','readwrite');
+      tx.objectStore('kv').put(value, key);
+      tx.oncomplete = ()=> resolve(true);
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }
+  async function dbDelete(key){
+    const db = await openDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction('kv','readwrite');
+      tx.objectStore('kv').delete(key);
+      tx.oncomplete = ()=> resolve(true);
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }
+
+  async function loadEntries(){
+    try{
+      const val = await dbGet('log-entries');
+      entries = Array.isArray(val) ? val : [];
+    }catch(err){
+      entries = [];
+    }
+    loaded = true;
+  }
+
+  async function saveEntries(){
+    try{
+      await dbSet('log-entries', entries);
+      return true;
+    }catch(err){
+      return false;
+    }
+  }
+
+  // ---------- Save new activity ----------
+  document.getElementById('btnGuardar').addEventListener('click', async ()=>{
+    const msg = document.getElementById('saveMsg');
+    const contrato = document.getElementById('f-contrato').value.trim();
+    const actividad = document.getElementById('f-actividad').value;
+    const tipo = document.getElementById('f-tipo').value;
+    const facturada = document.getElementById('f-facturada').dataset.value;
+    const equipos = document.getElementById('f-equipos').dataset.value;
+    const descripcion = document.getElementById('f-descripcion').value.trim();
+
+    if(!contrato || !actividad || !tipo || !facturada || !equipos){
+      msg.textContent = 'Completa contrato, actividad, tipo, facturada y equipos facturados.';
+      msg.className = 'msg err';
+      return;
+    }
+
+    const id = Date.now()+'-'+Math.random().toString(36).slice(2,8);
+    const entry = {
+      id, ts: new Date().toISOString(),
+      contrato, actividad, tipo, facturada, equipos, descripcion,
+      hasPhoto: !!photoData
+    };
+
+    document.getElementById('btnGuardar').disabled = true;
+    msg.textContent = 'Guardando...';
+    msg.className = 'msg';
+
+    try{
+      if(photoData){
+        await dbSet('photo-'+id, photoData);
+      }
+      entries.unshift(entry);
+      const ok = await saveEntries();
+      if(!ok) throw new Error('No se pudo guardar');
+      msg.textContent = 'Actividad guardada ✓';
+      msg.className = 'msg ok';
+      resetForm();
+    }catch(err){
+      entries.shift();
+      msg.textContent = 'Error al guardar. Intenta de nuevo.';
+      msg.className = 'msg err';
+    }
+    document.getElementById('btnGuardar').disabled = false;
+  });
+
+  function resetForm(){
+    document.getElementById('f-contrato').value='';
+    document.getElementById('f-actividad').value='';
+    document.getElementById('f-tipo').value='';
+    document.querySelectorAll('#f-facturada button, #f-equipos button').forEach(b=>b.classList.remove('active'));
+    document.getElementById('f-facturada').dataset.value='';
+    document.getElementById('f-equipos').dataset.value='';
+    document.getElementById('f-descripcion').value='';
+    photoData = null;
+    fFoto.value='';
+    photoPreview.style.display='none';
+    photoZoneText.textContent='Tocar para tomar o subir una foto';
+  }
+
+  // ---------- Historial ----------
+  async function renderHistorial(){
+    const cont = document.getElementById('historialContent');
+    if(!loaded) await loadEntries();
+    if(entries.length===0){
+      cont.innerHTML = '<div class="empty">Aún no hay actividades registradas.<br>Usa la pestaña Registrar para crear la primera.</div>';
+      return;
+    }
+    const groups = {};
+    entries.forEach(e=>{
+      const d = new Date(e.ts);
+      const key = d.toLocaleDateString('es-EC', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+      (groups[key] = groups[key]||[]).push(e);
+    });
+    let html = '';
+    Object.keys(groups).forEach(key=>{
+      html += `<div class="day-group"><h3>${key}</h3>`;
+      groups[key].forEach(e=>{
+        const tCls = e.tipo==='GPON' ? 't-gpon' : 't-hfc';
+        const dotCls = e.tipo==='GPON' ? 'gpon' : 'hfc';
+        const time = new Date(e.ts).toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'});
+        html += `
+        <div class="ticket ${tCls}">
+          <div class="ticket-head" data-id="${e.id}">
+            <div class="main">
+              <span class="dot ${dotCls}"></span>
+              <div class="info">
+                <div class="contrato">${escapeHtml(e.contrato)}</div>
+                <div class="actividad">${escapeHtml(e.actividad)}</div>
+              </div>
+            </div>
+            <div class="time">${time}</div>
+          </div>
+          <div class="ticket-body" id="body-${e.id}">
+            <div class="row"><b>Tipo:</b> ${e.tipo}</div>
+            <div class="row"><b>Facturada:</b> <span class="badge ${e.facturada==='SI'?'si':'no'}">${e.facturada}</span>
+              &nbsp;<b>Equipos:</b> <span class="badge ${e.equipos==='SI'?'si':'no'}">${e.equipos}</span></div>
+            ${e.descripcion ? `<div class="row"><b>Descripción:</b> ${escapeHtml(e.descripcion)}</div>` : ''}
+            ${e.hasPhoto ? `<img data-photoid="${e.id}" class="lazy-photo">` : ''}
+            <button class="del" data-del="${e.id}">Eliminar registro</button>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    cont.innerHTML = html;
+
+    cont.querySelectorAll('.ticket-head').forEach(h=>{
+      h.addEventListener('click', async ()=>{
+        const id = h.dataset.id;
+        const body = document.getElementById('body-'+id);
+        const opening = !body.classList.contains('open');
+        body.classList.toggle('open');
+        if(opening){
+          const img = body.querySelector('.lazy-photo');
+          if(img && !img.src){
+            try{
+              const val = await dbGet('photo-'+id);
+              if(val) img.src = val;
+            }catch(err){ /* photo unavailable */ }
+          }
+        }
+      });
+    });
+
+    cont.querySelectorAll('[data-del]').forEach(b=>{
+      b.addEventListener('click', async (ev)=>{
+        ev.stopPropagation();
+        const id = b.dataset.del;
+        if(!confirm('¿Eliminar este registro?')) return;
+        entries = entries.filter(e=>e.id!==id);
+        await saveEntries();
+        try{ await dbDelete('photo-'+id); }catch(err){}
+        renderHistorial();
+      });
+    });
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- Reporte ----------
+  const repMes = document.getElementById('rep-mes');
+  const now = new Date();
+  repMes.value = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  repMes.addEventListener('change', renderReporte);
+
+  function entriesForMonth(monthStr){
+    return entries.filter(e=> e.ts.slice(0,7) === monthStr);
+  }
+
+  async function renderReporte(){
+    if(!loaded) await loadEntries();
+    const monthStr = repMes.value;
+    const cont = document.getElementById('reportContent');
+    const list = entriesForMonth(monthStr);
+
+    if(list.length===0){
+      cont.innerHTML = '<div class="empty">No hay actividades registradas en este mes.</div>';
+      return;
+    }
+
+    const total = list.length;
+    const facturadas = list.filter(e=>e.facturada==='SI').length;
+    const equiposF = list.filter(e=>e.equipos==='SI').length;
+    const gpon = list.filter(e=>e.tipo==='GPON').length;
+    const hfc = list.filter(e=>e.tipo==='HFC').length;
+
+    const actCounts = {};
+    ACT_LIST.forEach(a=>actCounts[a]=0);
+    list.forEach(e=>{ actCounts[e.actividad] = (actCounts[e.actividad]||0)+1; });
+    const maxAct = Math.max(1, ...Object.values(actCounts));
+
+    let html = `
+      <div class="stat-grid">
+        <div class="stat"><div class="val">${total}</div><div class="lbl">Actividades</div></div>
+        <div class="stat"><div class="val">${facturadas}</div><div class="lbl">Facturadas (SI)</div></div>
+        <div class="stat"><div class="val">${equiposF}</div><div class="lbl">Equipos facturados (SI)</div></div>
+        <div class="stat"><div class="val">${gpon} / ${hfc}</div><div class="lbl">GPON / HFC</div></div>
+      </div>
+      <div class="breakdown">
+        <h4>Por tipo de actividad</h4>
+        ${ACT_LIST.map(a=>`
+          <div class="bar-row">
+            <div class="lbl">${a}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(actCounts[a]/maxAct*100)}%"></div></div>
+            <div class="num">${actCounts[a]}</div>
+          </div>`).join('')}
+      </div>
+      <div class="breakdown">
+        <h4>Detalle del mes (${list.length} registros)</h4>
+        <div class="rep-wrap"><table class="rep">
+          <thead><tr>
+            <th>Fecha</th><th>Contrato</th><th>Actividad</th><th>Tipo</th><th>Fact.</th><th>Equipos</th>
+          </tr></thead>
+          <tbody>
+          ${list.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts)).map(e=>`
+            <tr>
+              <td>${new Date(e.ts).toLocaleDateString('es-EC',{day:'2-digit',month:'2-digit'})}</td>
+              <td>${escapeHtml(e.contrato)}</td>
+              <td>${escapeHtml(e.actividad)}</td>
+              <td>${e.tipo}</td>
+              <td>${e.facturada}</td>
+              <td>${e.equipos}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>
+      </div>
+    `;
+    cont.innerHTML = html;
+  }
+
+  // ---------- CSV export ----------
+  document.getElementById('btnExportCsv').addEventListener('click', ()=>{
+    const monthStr = repMes.value;
+    const list = entriesForMonth(monthStr).slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+    if(list.length===0){ alert('No hay datos para exportar en este mes.'); return; }
+    const header = ['Fecha','Hora','Contrato','Actividad','Tipo','Facturada','Equipos Facturados','Descripcion'];
+    const rows = list.map(e=>{
+      const d = new Date(e.ts);
+      return [
+        d.toLocaleDateString('es-EC'),
+        d.toLocaleTimeString('es-EC'),
+        e.contrato, e.actividad, e.tipo, e.facturada, e.equipos,
+        (e.descripcion||'').replace(/\n/g,' ').replace(/"/g,'""')
+      ];
+    });
+    const csv = [header, ...rows].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reporte-actividades-${monthStr}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // ---------- Reset all ----------
+  document.getElementById('btnReset').addEventListener('click', async ()=>{
+    if(!confirm('Esto eliminará TODOS los registros guardados. ¿Continuar?')) return;
+    try{
+      for(const e of entries){
+        if(e.hasPhoto){ try{ await dbDelete('photo-'+e.id); }catch(err){} }
+      }
+      entries = [];
+      await saveEntries();
+      renderHistorial();
+      renderReporte();
+      alert('Registros eliminados.');
+    }catch(err){
+      alert('Ocurrió un error al borrar los datos.');
+    }
+  });
+
+  // ---------- Init ----------
+  loadEntries();
+})();
+</script>
+</body>
+</html>
